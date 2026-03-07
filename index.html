@@ -1,158 +1,112 @@
+<?php
+// ----------------------------
+// CONFIGURATION
+// ----------------------------
+$cf_api_key  = "BelZXfCmEkCb4zUcH9uEdosV3flnbQ9ZVFmWFqQO";
+$cf_email    = "joshuaking2786@gmail.com";
+$zone_id     = "e32fdc865b5bc0271983b1e96ca08b1f";
+$root_domain = "gosd.qzz.io";
+
+// ----------------------------
+// HANDLE FORM SUBMISSION
+// ----------------------------
+$result = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $sub = strtolower(trim($_POST["subdomain"]));
+    $full_domain = $sub . "." . $root_domain;
+
+    // 1. CHECK IF DNS RECORD EXISTS
+    $check_url = "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?name=$full_domain";
+
+    $check = curl_init();
+    curl_setopt($check, CURLOPT_URL, $check_url);
+    curl_setopt($check, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($check, CURLOPT_HTTPHEADER, [
+        "X-Auth-Email: $cf_email",
+        "X-Auth-Key: $cf_api_key",
+        "Content-Type: application/json"
+    ]);
+
+    $check_response = json_decode(curl_exec($check), true);
+    curl_close($check);
+
+    if (!empty($check_response["result"])) {
+        $result = "❌ Error: Domain Taken";
+    } else {
+        // 2. REGISTER THE SUBDOMAIN
+        $create_url = "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records";
+
+        $dns_data = [
+            "type" => "A",
+            "name" => $full_domain,
+            "content" => "1.1.1.1", // CHANGE THIS TO YOUR SERVER IP
+            "ttl" => 1,
+            "proxied" => false
+        ];
+
+        $create = curl_init();
+        curl_setopt($create, CURLOPT_URL, $create_url);
+        curl_setopt($create, CURLOPT_POST, true);
+        curl_setopt($create, CURLOPT_POSTFIELDS, json_encode($dns_data));
+        curl_setopt($create, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($create, CURLOPT_HTTPHEADER, [
+            "X-Auth-Email: $cf_email",
+            "X-Auth-Key: $cf_api_key",
+            "Content-Type: application/json"
+        ]);
+
+        $create_response = json_decode(curl_exec($create), true);
+        curl_close($create);
+
+        if (!empty($create_response["success"])) {
+            // 3. GET NAMESERVERS
+            $zone_info_url = "https://api.cloudflare.com/client/v4/zones/$zone_id";
+
+            $zone = curl_init();
+            curl_setopt($zone, CURLOPT_URL, $zone_info_url);
+            curl_setopt($zone, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($zone, CURLOPT_HTTPHEADER, [
+                "X-Auth-Email: $cf_email",
+                "X-Auth-Key: $cf_api_key",
+                "Content-Type: application/json"
+            ]);
+
+            $zone_info = json_decode(curl_exec($zone), true);
+            curl_close($zone);
+
+            $ns = implode(", ", $zone_info["result"]["name_servers"]);
+
+            $result = "✅ Registered!<br>Subdomain: <strong>$full_domain</strong><br>Nameservers: <strong>$ns</strong>";
+        } else {
+            $result = "❌ Error: Could not register domain";
+        }
+    }
+}
+?>
+
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>gosd.qzz.io Subdomains | Guide</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-  :root {
-    --bg: #f5f5f7;
-    --text: #111;
-    --muted: #555;
-    --link: #0066ff;
-    --card-bg: #ffffff;
-    --border: #dcdcdc;
-    --radius: 10px;
-  }
-
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: "Inter", system-ui, sans-serif;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    padding: 40px 20px;
-  }
-
-  .header {
-    text-align: center;
-    margin-bottom: 40px;
-  }
-
-  .title {
-    font-size: 40px;
-    font-weight: 800;
-  }
-
-  .subtitle {
-    font-size: 18px;
-    color: var(--muted);
-    margin-top: 6px;
-  }
-
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px;
-    max-width: 800px;
-    margin: 0 auto 25px auto;
-  }
-
-  .card h2 {
-    font-size: 24px;
-    margin-bottom: 12px;
-  }
-
-  .card p {
-    margin-bottom: 12px;
-    line-height: 1.6;
-  }
-
-  .card a {
-    color: var(--link);
-    text-decoration: none;
-    font-weight: 600;
-  }
-
-  .card code {
-    background: #eee;
-    padding: 4px 6px;
-    border-radius: 6px;
-    font-size: 14px;
-  }
-
-  .card ul {
-    margin: 10px 0 15px 20px;
-  }
-
-  .footer {
-    text-align: center;
-    margin-top: 40px;
-    color: var(--muted);
-    font-size: 14px;
-  }
-</style>
+    <title>Register Subdomain</title>
+    <style>
+        body { font-family: Arial; padding: 40px; }
+        input { padding: 10px; width: 250px; }
+        button { padding: 10px 20px; }
+        #result { margin-top: 20px; font-weight: bold; }
+    </style>
 </head>
-
 <body>
 
-<div class="header">
-  <div class="title">gosd.qzz.io Subdomains</div>
-  <div class="subtitle">Get your own free subdomain at <strong>&lt;subdomain&gt;.gosd.qzz.io</strong></div>
-</div>
+<h2>Register a Subdomain on gosd.qzz.io</h2>
 
-<div class="card">
-  <h2>How to Get Your Subdomain</h2>
+<form method="POST">
+    <input name="subdomain" placeholder="yourname" required>
+    <button type="submit">Register</button>
+</form>
 
-  <p>You can request any available subdomain under:</p>
-  <code>https://&lt;subdomain&gt;.gosd.qzz.io</code>
-
-  <p>To claim one:</p>
-
-  <p>1. Fork the official GitHub repository:<br>
-    <a href="https://github.com/geekoutcoding/infinityfreebios" target="_blank">
-      github.com/geekoutcoding/infinityfreebios
-    </a>
-  </p>
-
-  <p>2. Inside your fork, create a file named <strong>domain.md</strong>.</p>
-
-  <p>3. Add the following required fields:</p>
-
-  <ul>
-    <li><strong>name</strong> — your real or preferred name</li>
-    <li><strong>email</strong> — used only for verification</li>
-    <li><strong>nameservers</strong> — if you want DNS control (optional)</li>
-    <li><strong>domain</strong> — the subdomain you want (example: <code>josh.gosd.qzz.io</code>)</li>
-  </ul>
-
-  <p>Example domain.md:</p>
-
-  <code>
-    name: Josh<br>
-    email: example@mail.com<br>
-    nameservers: ns1.example.com, ns2.example.com<br>
-    domain: josh.gosd.qzz.io
-  </code>
-</div>
-
-<div class="card">
-  <h2>What Happens Next</h2>
-
-  <p>Once your request is reviewed and approved, your subdomain will be created and pointed to your hosted page or nameservers.</p>
-
-  <p>You can use it for:</p>
-
-  <ul>
-    <li>Personal websites</li>
-    <li>Project pages</li>
-    <li>Developer portfolios</li>
-    <li>Bio link hubs</li>
-    <li>Static sites and tools</li>
-  </ul>
-
-  <p>Your final URL will look like:</p>
-  <code>https://yourname.gosd.qzz.io</code>
-</div>
-
-<div class="footer">
-  Powered by GeekOut Engine • gosd.qzz.io Subdomain Service
+<div id="result">
+    <?php echo $result; ?>
 </div>
 
 </body>
