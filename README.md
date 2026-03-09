@@ -1,2 +1,2 @@
 <h1><strong>GeekOut Subdomains</strong></h1>
-<p>Get Your Subdomain On gosb.qzz.io</p>
+<p>Get Your Subdomain On geekout.lol</p>
